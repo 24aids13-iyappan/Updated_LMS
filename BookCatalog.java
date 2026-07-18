@@ -88,7 +88,12 @@ public class BookCatalog extends JFrame {
         backBtn.setForeground(Color.WHITE);
         backBtn.setFont(new Font("Segoe UI", Font.BOLD, 15));
         bgPanel.add(backBtn);
-
+JButton btnAISearch = new JButton("AI Search");
+btnAISearch.setBounds(830, 90, 140, 35);
+btnAISearch.setBackground(new Color(150, 50, 200));
+btnAISearch.setForeground(Color.WHITE);
+btnAISearch.setFont(new Font("Segoe UI", Font.BOLD, 15));
+bgPanel.add(btnAISearch);
         // TABLE MODEL
         model = new DefaultTableModel();
         model.addColumn("ID");
@@ -139,7 +144,7 @@ public class BookCatalog extends JFrame {
             dispose();
             new UserDashboard(con, userid).setVisible(true);
         });
-
+btnAISearch.addActionListener(e -> aiSearchBooks());
         loadBooks(""); // default - show all books, scrollable
 
         setVisible(true);
@@ -186,6 +191,65 @@ public class BookCatalog extends JFrame {
             JOptionPane.showMessageDialog(this, "Error loading books!");
         }
     }
+    private void aiSearchBooks() {
+
+    String userQuery = txtSearch.getText().trim();
+
+    if (userQuery.isEmpty()) {
+        JOptionPane.showMessageDialog(this, "Type what kind of book you want!");
+        return;
+    }
+
+    setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+
+    new Thread(() -> {
+        try {
+            java.util.List<Integer> matchedIds = AIService.smartSearch(con, userQuery);
+
+            SwingUtilities.invokeLater(() -> {
+                model.setRowCount(0);
+                int count = 0;
+
+                if (matchedIds.isEmpty()) {
+                    JOptionPane.showMessageDialog(this, "No good matches found. Try different words!");
+                } else {
+                    try {
+                        for (int id : matchedIds) {
+                            PreparedStatement pst = con.prepareStatement(
+                                    "SELECT * FROM books WHERE book_id=?");
+                            pst.setInt(1, id);
+                            ResultSet rs = pst.executeQuery();
+                            if (rs.next()) {
+                                model.addRow(new Object[]{
+                                        rs.getInt("book_id"),
+                                        rs.getString("title"),
+                                        rs.getString("author"),
+                                        rs.getString("publisher"),
+                                        rs.getString("edition"),
+                                        rs.getString("quantity")
+                                });
+                                count++;
+                            }
+                            rs.close();
+                            pst.close();
+                        }
+                    } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(this, "Error loading matched books");
+                    }
+                }
+                lblCount.setText("Total Books: " + count);
+                setCursor(Cursor.getDefaultCursor());
+            });
+
+        } catch (Exception ex) {
+            SwingUtilities.invokeLater(() -> {
+                setCursor(Cursor.getDefaultCursor());
+                JOptionPane.showMessageDialog(this,
+                        "AI search failed: " + ex.getMessage());
+            });
+        }
+    }).start();
+}
 
     class BackgroundPanel extends JPanel {
         Image bg = new ImageIcon("bgphoto/viewbooks_bg.jpg").getImage();
