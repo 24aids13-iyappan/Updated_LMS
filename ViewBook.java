@@ -4,64 +4,66 @@ import java.sql.*;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 
-
 public class ViewBook extends JFrame {
 
     private Connection con;
     private String userId;
     JTable table;
     DefaultTableModel model;
-JLabel lblCount;
+    JLabel lblCount;
+    JTextField txtSearch;
+
     public ViewBook(Connection con, String userId) {
 
         this.con = con;
-this.userId = userId;
+        this.userId = userId;
 
         setTitle("View Books");
-        setSize(800, 500);
+        setSize(900, 600);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-JLabel title = new JLabel("Books Collection", SwingConstants.CENTER);
-title.setFont(new Font("Segoe UI", Font.BOLD, 24));
-title.setForeground(new Color(92,64,51));
+        setLayout(new BorderLayout());
 
+        // TOP - title + search + count, stacked
+        JPanel topContainer = new JPanel();
+        topContainer.setLayout(new BoxLayout(topContainer, BoxLayout.Y_AXIS));
 
-    lblCount = new JLabel("Total Books: 0", SwingConstants.CENTER);
-lblCount.setFont(new Font("Segoe UI", Font.BOLD, 16));
-lblCount.setForeground(new Color(0, 120, 215));
+        JLabel title = new JLabel("Books Collection", SwingConstants.CENTER);
+        title.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        title.setForeground(new Color(92, 64, 51));
+        title.setAlignmentX(Component.CENTER_ALIGNMENT);
+        topContainer.add(title);
+        topContainer.add(Box.createVerticalStrut(10));
 
-JPanel topPanel = new JPanel(new BorderLayout());
-topPanel.add(title, BorderLayout.NORTH);
-topPanel.add(lblCount, BorderLayout.SOUTH);
-add(topPanel, BorderLayout.NORTH);  
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JLabel lblSearch = new JLabel("Search Title/Author:");
+        searchPanel.add(lblSearch);
 
-        BackgroundPanel bgPanel = new BackgroundPanel("bgphoto/ViewBook_bg.jpg");
-        bgPanel.setLayout(new BorderLayout());
-        setContentPane(bgPanel);
+        txtSearch = new JTextField(20);
+        searchPanel.add(txtSearch);
 
-        // Table model
+        JButton btnSearch = new JButton("Search");
+        searchPanel.add(btnSearch);
+
+        JButton btnShowAll = new JButton("Show All");
+        searchPanel.add(btnShowAll);
+
+        lblCount = new JLabel("Total Books: 0");
+        lblCount.setFont(new Font("Segoe UI", Font.BOLD, 15));
+        lblCount.setForeground(new Color(0, 120, 215));
+        searchPanel.add(lblCount);
+
+        topContainer.add(searchPanel);
+        add(topContainer, BorderLayout.NORTH);
+
+        // TABLE
         model = new DefaultTableModel();
         table = new JTable(model);
         table.setDefaultEditor(Object.class, null);
-table.setOpaque(false);
-table.setBackground(new Color(0, 0, 0, 0));
-table.setForeground(Color.BLACK);
-
-table.addMouseListener(new java.awt.event.MouseAdapter() {
-    public void mouseClicked(java.awt.event.MouseEvent e) {
-        if (e.getClickCount() == 2) {
-            int row = table.getSelectedRow();
-            if (row != -1) {
-                int bookId = (int) model.getValueAt(row, 0);
-                new BookDetailView(con, bookId).setVisible(true);
-            }
-        }
-    }
-});
-
-((DefaultTableCellRenderer)table.getDefaultRenderer(Object.class))
-        .setOpaque(false);
+        table.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        table.setRowHeight(28);
+        table.setForeground(Color.BLACK);
 
         model.addColumn("Book_ID");
         model.addColumn("Book_name");
@@ -70,28 +72,25 @@ table.addMouseListener(new java.awt.event.MouseAdapter() {
         model.addColumn("Edition");
         model.addColumn("Quantity");
 
-        // Table style
-        table.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        table.setRowHeight(28);
-        table.getTableHeader().setFont(
-                new Font("Segoe UI", Font.BOLD, 15));
+        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 15));
 
-               /* JScrollPane scrollPane = new JScrollPane(table);
-        scrollPane.getViewport().setBackground(
-                new Color(245, 238, 220));*/
+        table.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    int row = table.getSelectedRow();
+                    if (row != -1) {
+                        int bookId = (int) model.getValueAt(row, 0);
+                        new BookDetailView(con, bookId).setVisible(true);
+                    }
+                }
+            }
+        });
 
-JScrollPane scrollPane = new JScrollPane(table);
+        JScrollPane scrollPane = new JScrollPane(table);
+        add(scrollPane, BorderLayout.CENTER);
 
-scrollPane.setOpaque(false);
-scrollPane.getViewport().setOpaque(false);
-scrollPane.setBorder(null);
-
-add(scrollPane, BorderLayout.CENTER);
-
-        // Bottom button panel
-        JPanel panel = new JPanel();
-        panel.setOpaque(false);
-
+        // BOTTOM - back button
+        JPanel bottomPanel = new JPanel();
         JButton backBtn = new JButton("Back");
         backBtn.setBackground(new Color(220, 53, 69));
         backBtn.setForeground(Color.WHITE);
@@ -102,25 +101,38 @@ add(scrollPane, BorderLayout.CENTER);
             new AdminDashboard(con, userId).setVisible(true);
         });
 
-        panel.add(backBtn);
+        bottomPanel.add(backBtn);
+        add(bottomPanel, BorderLayout.SOUTH);
 
-        loadBooks();
-        
+        // ACTIONS
+        btnSearch.addActionListener(e -> loadBooks(txtSearch.getText().trim()));
+        btnShowAll.addActionListener(e -> { txtSearch.setText(""); loadBooks(""); });
 
-       // add(scrollPane, BorderLayout.CENTER);
-        add(panel, BorderLayout.SOUTH);
+        loadBooks("");
 
         setVisible(true);
     }
 
-    private void loadBooks() {
-        try {
+    private void loadBooks(String keyword) {
+        model.setRowCount(0);
+        int count = 0;
 
-            String query = "SELECT * FROM books";
-            PreparedStatement pst =
-                    con.prepareStatement(query);
+        try {
+            String query;
+            PreparedStatement pst;
+
+            if (keyword.isEmpty()) {
+                query = "SELECT * FROM books";
+                pst = con.prepareStatement(query);
+            } else {
+                query = "SELECT * FROM books WHERE title LIKE ? OR author LIKE ?";
+                pst = con.prepareStatement(query);
+                pst.setString(1, "%" + keyword + "%");
+                pst.setString(2, "%" + keyword + "%");
+            }
+
             ResultSet rs = pst.executeQuery();
-int count = 0;
+
             while (rs.next()) {
                 model.addRow(new Object[]{
                         rs.getInt("book_id"),
@@ -132,24 +144,14 @@ int count = 0;
                 });
                 count++;
             }
+
             lblCount.setText("Total Books: " + count);
 
+            rs.close();
+            pst.close();
+
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, e);
-        }
-    }
-
-    class BackgroundPanel extends JPanel {
-        private Image image;
-
-        public BackgroundPanel(String path) {
-            image = new ImageIcon(path).getImage();
-        }
-
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            g.drawImage(image, 0, 0,
-                    getWidth(), getHeight(), this);
+            JOptionPane.showMessageDialog(this, "Error loading books: " + e.getMessage());
         }
     }
 }
