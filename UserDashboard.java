@@ -98,7 +98,7 @@ menuuserprofile.addActionListener(e -> { dispose();new UserProfile(con,userid).s
  
 menuborrow.addActionListener(e -> { dispose();new BorrowedBooks(con,userid).setVisible(true);});
  
-btnAISearch.addActionListener(e -> aiDashboardSearch());
+btnAISearch.addActionListener(e -> openAiChat());
  
 logout.addActionListener(e -> {
 dispose();
@@ -107,35 +107,12 @@ new LoginGUI(con).setVisible(true);
  
     }
  
-    // AI-powered Google-style search from the dashboard
-    private void aiDashboardSearch() {
- 
+    // Opens the chat-style AI assistant window.
+    // If the user already typed something in the dashboard search box,
+    // that query is sent automatically as the first chat message.
+    private void openAiChat() {
         String query = txtAISearch.getText().trim();
- 
-        if (query.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Type what kind of book you're looking for!");
-            return;
-        }
- 
-        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
- 
-        new Thread(() -> {
-            try {
-                java.util.List<Integer> matchedIds = AIService.smartSearch(con, query);
- 
-                SwingUtilities.invokeLater(() -> {
-                    setCursor(Cursor.getDefaultCursor());
-                    dispose();
-                    new AISearchResultsView(con, userid, query, matchedIds).setVisible(true);
-                });
- 
-            } catch (Exception ex) {
-                SwingUtilities.invokeLater(() -> {
-                    setCursor(Cursor.getDefaultCursor());
-                    JOptionPane.showMessageDialog(this,
-                            "AI search failed: " + ex.getMessage());
-                });
-            }
-        }).start();
+        dispose();
+        new ChatAISearchView(con, userid, query.isEmpty() ? null : query).setVisible(true);
     }
 }
