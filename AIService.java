@@ -1,127 +1,172 @@
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.sql.*;
 import java.util.*;
+import java.util.regex.*;
  
 /*
- * AIService - REAL AI powered book search.
- * (Approach 1: LLM re-ranks results from the full book catalog)
+ * AIService - Local "smart search" using TF-IDF + Cosine Similarity.
+ * NO API calls, NO cost, NO internet needed - works 100% offline.
  *
- * SETUP:
- *   1. Get API key from https://console.anthropic.com
- *   2. Set env variable: ANTHROPIC_API_KEY
- *   3. Uses Java 11+ built-in HttpClient (no extra library needed)
+ * This is a real information-retrieval algorithm (same family of techniques
+ * used by search engines) implemented from scratch in Java.
+ *
+ * How it works:
+ *   1. Each book (title + author + description) becomes a "document"
+ *   2. TF-IDF (Term Frequency - Inverse Document Frequency) scores how
+ *      important each word is - common words score low, rare/distinctive
+ *      words score high
+ *   3. The user's query is converted into the same kind of vector
+ *   4. Cosine Similarity measures how close the query vector is to each
+ *      book's vector
+ *   5. Books are ranked by similarity score, best matches returned first
+ *
+ * Method signature is unchanged (smartSearch(Connection, String)) so no
+ * other file needs to change - UserDashboard.java and AISearchResultsView.java
+ * call this exactly the same way as before.
  */
 public class AIService {
  
-    private static final String API_URL = "https://api.anthropic.com/v1/messages";
-    private static final String API_KEY = System.getenv("ANTHROPIC_API_KEY");
-    private static final String MODEL = "claude-sonnet-5";   // FIXED - was "claude-sonnet-4-6" (invalid)
+    // Common English words that don't help distinguish topics
+    private static final Set<String> STOP_WORDS = new HashSet<>(Arrays.asList(
+            "a", "an", "the", "is", "are", "was", "were", "i", "want", "to", "for",
+            "of", "on", "in", "and", "or", "book", "books", "about", "with", "me",
+            "give", "find", "show", "some", "any", "please", "need", "looking",
+            "that", "this", "it", "at", "by", "as", "be", "can", "will"
+    ));
  
     public static List<Integer> smartSearch(Connection con, String userQuery) throws Exception {
  
-        if (API_KEY == null || API_KEY.isEmpty()) {
-            throw new Exception("ANTHROPIC_API_KEY environment variable is not set!");
-        }
+        // Step 1: Load all books
+        List<Integer> bookIds = new ArrayList<>();
+        List<String> documents = new ArrayList<>();
  
-        // Step 1: Pull all books
-        StringBuilder bookListText = new StringBuilder();
-        Map<Integer, String> idToTitle = new LinkedHashMap<>();
- 
-        String sql = "SELECT book_id, title, author FROM books";
+        String sql = "SELECT book_id, title, author, description FROM books";
         PreparedStatement pst = con.prepareStatement(sql);
         ResultSet rs = pst.executeQuery();
  
         while (rs.next()) {
-            int id = rs.getInt("book_id");
-            String title = rs.getString("title");
-            String author = rs.getString("author");
-            idToTitle.put(id, title);
-            bookListText.append(id).append(": \"").append(title)
-                    .append("\" by ").append(author).append("\n");
+            bookIds.add(rs.getInt("book_id"));
+ 
+            String title = safe(rs.getString("title"));
+            String author = safe(rs.getString("author"));
+            String description = "";
+            try { description = safe(rs.getString("description")); } catch (Exception ignore) {}
+ 
+            // Weight title words more by repeating them (simple boosting trick)
+            documents.add(title + " " + title + " " + author + " " + description);
         }
         rs.close();
         pst.close();
  
-        if (idToTitle.isEmpty()) return Collections.emptyList();
+        if (bookIds.isEmpty()) return Collections.emptyList();
  
-        // Step 2: Build the prompt
-        String prompt = "You are a library book search assistant. Here is the full book catalog:\n\n"
-                + bookListText.toString()
-                + "\nUser request: \"" + userQuery + "\"\n\n"
-                + "Return ONLY a JSON array of the book_id numbers that best match the user's "
-                + "request, ordered from most relevant to least relevant. "
-                + "Return at most 10 ids. If nothing matches well, return an empty array []. "
-                + "Do not include any explanation, only the JSON array.";
+        // Step 2: Tokenize all documents + the query
+        List<List<String>> tokenizedDocs = new ArrayList<>();
+        for (String doc : documents) {
+            tokenizedDocs.add(tokenize(doc));
+        }
+        List<String> queryTokens = tokenize(userQuery);
  
-        String jsonBody = "{"
-                + "\"model\":\"" + MODEL + "\","
-                + "\"max_tokens\":500,"
-                + "\"messages\":[{\"role\":\"user\",\"content\":" + escapeJson(prompt) + "}]"
-                + "}";
+        if (queryTokens.isEmpty()) return Collections.emptyList();
  
-        HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(API_URL))
-                .header("Content-Type", "application/json")
-                .header("x-api-key", API_KEY)
-                .header("anthropic-version", "2023-06-01")
-                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
-                .build();
+        // Step 3: Build vocabulary (all unique words across documents + query)
+        Set<String> vocabulary = new HashSet<>();
+        for (List<String> doc : tokenizedDocs) vocabulary.addAll(doc);
+        vocabulary.addAll(queryTokens);
  
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-        String responseBody = response.body();
+        // Step 4: Compute IDF (Inverse Document Frequency) for each word
+        Map<String, Double> idf = new HashMap<>();
+        int totalDocs = tokenizedDocs.size();
  
-        // CRITICAL FIX - check status code BEFORE parsing.
-        // Without this, API errors (bad model name, bad key, etc.) were silently
-        // treated as "no matches found" instead of showing the real problem.
-        if (response.statusCode() != 200) {
-            throw new Exception("API Error (status " + response.statusCode() + "): " + responseBody);
+        for (String word : vocabulary) {
+            int docCount = 0;
+            for (List<String> doc : tokenizedDocs) {
+                if (doc.contains(word)) docCount++;
+            }
+            // +1 smoothing to avoid division by zero
+            double idfValue = Math.log((double) (totalDocs + 1) / (docCount + 1)) + 1;
+            idf.put(word, idfValue);
         }
  
-        String text = extractTextField(responseBody);
+        // Step 5: Compute TF-IDF vector for the query
+        Map<String, Double> queryVector = computeTfIdfVector(queryTokens, idf);
  
-        return parseIdArray(text);
-    }
+        // Step 6: Compute TF-IDF vector for each document, then cosine similarity vs query
+        List<double[]> scores = new ArrayList<>(); // [bookIndex, similarityScore]
  
-    // --- tiny helpers, no external JSON library needed ---
- 
-    private static String escapeJson(String s) {
-        return "\"" + s.replace("\\", "\\\\")
-                       .replace("\"", "\\\"")
-                       .replace("\n", "\\n") + "\"";
-    }
- 
-    private static String extractTextField(String responseJson) {
-        int idx = responseJson.indexOf("\"text\":\"");
-        if (idx == -1) return "[]";
-        int start = idx + 8;
-        int end = responseJson.indexOf("\"", start);
-        while (end > 0 && responseJson.charAt(end - 1) == '\\') {
-            end = responseJson.indexOf("\"", end + 1);
+        for (int i = 0; i < tokenizedDocs.size(); i++) {
+            Map<String, Double> docVector = computeTfIdfVector(tokenizedDocs.get(i), idf);
+            double similarity = cosineSimilarity(queryVector, docVector);
+            scores.add(new double[]{i, similarity});
         }
-        if (end == -1) return "[]";
-        return responseJson.substring(start, end)
-                .replace("\\n", "\n")
-                .replace("\\\"", "\"");
+ 
+        // Step 7: Sort by similarity descending
+        scores.sort((a, b) -> Double.compare(b[1], a[1]));
+ 
+        // Step 8: Return top matches with a meaningful similarity (> 0), max 10
+        List<Integer> result = new ArrayList<>();
+        for (double[] entry : scores) {
+            if (entry[1] <= 0.0001) break; // no more relevant matches
+            result.add(bookIds.get((int) entry[0]));
+            if (result.size() >= 10) break;
+        }
+ 
+        return result;
     }
  
-    private static List<Integer> parseIdArray(String text) {
-        List<Integer> ids = new ArrayList<>();
-        int start = text.indexOf('[');
-        int end = text.indexOf(']');
-        if (start == -1 || end == -1) return ids;
+    // --- Helper methods ---
  
-        String inner = text.substring(start + 1, end).trim();
-        if (inner.isEmpty()) return ids;
+    private static String safe(String s) {
+        return s == null ? "" : s;
+    }
  
-        for (String part : inner.split(",")) {
-            try {
-                ids.add(Integer.parseInt(part.trim()));
-            } catch (NumberFormatException ignore) {}
+    private static List<String> tokenize(String text) {
+        String lower = text.toLowerCase();
+        String[] words = lower.split("[^a-z0-9]+");
+        List<String> tokens = new ArrayList<>();
+        for (String w : words) {
+            if (w.length() > 1 && !STOP_WORDS.contains(w)) {
+                tokens.add(w);
+            }
         }
-        return ids;
+        return tokens;
+    }
+ 
+    private static Map<String, Double> computeTfIdfVector(List<String> tokens, Map<String, Double> idf) {
+        Map<String, Integer> termCount = new HashMap<>();
+        for (String token : tokens) {
+            termCount.merge(token, 1, Integer::sum);
+        }
+ 
+        Map<String, Double> vector = new HashMap<>();
+        int totalTerms = tokens.size();
+ 
+        for (Map.Entry<String, Integer> entry : termCount.entrySet()) {
+            double tf = (double) entry.getValue() / totalTerms;
+            double idfValue = idf.getOrDefault(entry.getKey(), 1.0);
+            vector.put(entry.getKey(), tf * idfValue);
+        }
+ 
+        return vector;
+    }
+ 
+    private static double cosineSimilarity(Map<String, Double> v1, Map<String, Double> v2) {
+        Set<String> allWords = new HashSet<>(v1.keySet());
+        allWords.addAll(v2.keySet());
+ 
+        double dotProduct = 0.0;
+        double normA = 0.0;
+        double normB = 0.0;
+ 
+        for (String word : allWords) {
+            double a = v1.getOrDefault(word, 0.0);
+            double b = v2.getOrDefault(word, 0.0);
+            dotProduct += a * b;
+            normA += a * a;
+            normB += b * b;
+        }
+ 
+        if (normA == 0 || normB == 0) return 0.0;
+ 
+        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
     }
 }
