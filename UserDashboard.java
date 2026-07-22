@@ -17,6 +17,7 @@ public class UserDashboard extends JFrame {
     private JPanel searchRow;      // holds txtInput + search button - gets moved around
     private JPanel centerWrapper;  // holds searchRow centered, shown before first search
     private JPanel bottomInputBar; // holds searchRow at the bottom, shown after first search
+    private JPanel chatWrapper;    // adds side margins around chatScroll so it lines up with the banner/input bar
     private boolean chatStarted = false;
 
     public UserDashboard(Connection con, String userid) {
@@ -51,7 +52,7 @@ public class UserDashboard extends JFrame {
         // TOP - Welcome banner
         JPanel topBanner = new JPanel(new BorderLayout());
         topBanner.setOpaque(true);
-        topBanner.setBackground(new Color(0, 0, 0, 140));
+        topBanner.setBackground(new Color(0, 0, 0, 200)); // was 140 - more opaque so text stays readable over bg image
         topBanner.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
 
         JLabel title = new JLabel("Welcome, " + displayName + "!");
@@ -72,14 +73,21 @@ public class UserDashboard extends JFrame {
         chatPanel = new JPanel();
         chatPanel.setLayout(new BoxLayout(chatPanel, BoxLayout.Y_AXIS));
         chatPanel.setOpaque(true);
-        chatPanel.setBackground(new Color(245, 238, 220, 235));
-        chatPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        chatPanel.setBackground(new Color(245, 238, 220, 255)); // was 235 alpha - fully opaque so text isn't washed out
+        chatPanel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20)); // matches banner's 20px side padding
 
         chatScroll = new JScrollPane(chatPanel);
         chatScroll.setBorder(null);
         chatScroll.getVerticalScrollBar().setUnitIncrement(16);
         chatScroll.setOpaque(false);
         chatScroll.getViewport().setOpaque(false);
+
+        // Wrapper adds left/right margins so the chat box lines up with the
+        // banner and bottom bar instead of running edge-to-edge in the frame
+        chatWrapper = new JPanel(new BorderLayout());
+        chatWrapper.setOpaque(false);
+        chatWrapper.setBorder(BorderFactory.createEmptyBorder(0, 15, 0, 15));
+        chatWrapper.add(chatScroll, BorderLayout.CENTER);
 
         toggleChatBtn.addActionListener(e -> {
             boolean nowVisible = !chatScroll.isVisible();
@@ -142,7 +150,7 @@ public class UserDashboard extends JFrame {
         bottomInputBar = new JPanel(new BorderLayout());
         bottomInputBar.setBorder(BorderFactory.createEmptyBorder(12, 15, 15, 15));
         bottomInputBar.setOpaque(true);
-        bottomInputBar.setBackground(new Color(0, 0, 0, 140));
+        bottomInputBar.setBackground(new Color(0, 0, 0, 200)); // was 140 - more opaque so text stays readable over bg image
         // searchRow gets added into this panel later, when the first search happens
 
         btnSend.addActionListener(e -> sendMessage());
@@ -200,7 +208,7 @@ public class UserDashboard extends JFrame {
             searchRow.setMaximumSize(null);
             bottomInputBar.add(searchRow, BorderLayout.CENTER);
 
-            bgPanel.add(chatScroll, BorderLayout.CENTER);
+            bgPanel.add(chatWrapper, BorderLayout.CENTER);
             bgPanel.add(bottomInputBar, BorderLayout.SOUTH);
 
             chatScroll.setVisible(true);
@@ -333,6 +341,7 @@ public class UserDashboard extends JFrame {
                         bookRow.setOpaque(false);
                         bookRow.setAlignmentX(Component.LEFT_ALIGNMENT);
                         bookRow.setMaximumSize(new Dimension(420, 35));
+                        bookRow.setToolTipText("Double-click to view book cover & details");
 
                         JLabel bookLabel = new JLabel("[ID " + id + "] " + bookTitle + " \u2014 " + author);
                         bookLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
@@ -340,6 +349,22 @@ public class UserDashboard extends JFrame {
                         JButton viewBtn = new JButton("View");
                         viewBtn.setFont(new Font("Segoe UI", Font.PLAIN, 11));
                         viewBtn.addActionListener(e -> new BookDetailView(con, id).setVisible(true));
+
+                        // Double-click anywhere on the row also opens the book detail view
+                        bookRow.addMouseListener(new java.awt.event.MouseAdapter() {
+                            public void mouseClicked(java.awt.event.MouseEvent e) {
+                                if (e.getClickCount() == 2) {
+                                    new BookDetailView(con, id).setVisible(true);
+                                }
+                            }
+                        });
+                        bookLabel.addMouseListener(new java.awt.event.MouseAdapter() {
+                            public void mouseClicked(java.awt.event.MouseEvent e) {
+                                if (e.getClickCount() == 2) {
+                                    new BookDetailView(con, id).setVisible(true);
+                                }
+                            }
+                        });
 
                         bookRow.add(bookLabel, BorderLayout.CENTER);
                         bookRow.add(viewBtn, BorderLayout.EAST);
