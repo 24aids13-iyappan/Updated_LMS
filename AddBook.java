@@ -19,7 +19,7 @@ this.userId = userId;
         setSize(650, 700);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
+setResizable(false);
         Color brown = new Color(92, 64, 51);
         Color paper = new Color(245, 238, 220);
 

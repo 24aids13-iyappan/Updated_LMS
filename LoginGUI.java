@@ -20,7 +20,7 @@ public class LoginGUI extends JFrame implements ActionListener {
         setSize(800,500);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
+setResizable(false);
         // 🔥 Background Image
         ImageIcon bgIcon = new ImageIcon("bgphoto/Login_bg.png");
         Image img = bgIcon.getImage().getScaledInstance(800,500,Image.SCALE_SMOOTH);

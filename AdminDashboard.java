@@ -15,7 +15,7 @@ this.userid = userid;
 setMinimumSize(new Dimension(700,500));
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
+setResizable(false);
         
 
         

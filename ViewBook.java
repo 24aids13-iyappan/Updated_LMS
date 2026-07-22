@@ -2,7 +2,6 @@ import javax.swing.*;
 import java.awt.*;
 import java.sql.*;
 import javax.swing.table.DefaultTableModel;
-import javax.swing.table.DefaultTableCellRenderer;
 
 public class ViewBook extends JFrame {
 
@@ -20,14 +19,18 @@ public class ViewBook extends JFrame {
 
         setTitle("View Books");
         setSize(900, 600);
+        setResizable(false);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+setResizable(false);
+        BackgroundPanel bgPanel = new BackgroundPanel();
+        bgPanel.setLayout(new BorderLayout());
+        setContentPane(bgPanel);
 
-        setLayout(new BorderLayout());
-
-        // TOP - title + search + count, stacked
+        // TOP - title + search + count
         JPanel topContainer = new JPanel();
         topContainer.setLayout(new BoxLayout(topContainer, BoxLayout.Y_AXIS));
+        topContainer.setOpaque(false);
 
         JLabel title = new JLabel("Books Collection", SwingConstants.CENTER);
         title.setFont(new Font("Segoe UI", Font.BOLD, 24));
@@ -37,6 +40,7 @@ public class ViewBook extends JFrame {
         topContainer.add(Box.createVerticalStrut(10));
 
         JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        searchPanel.setOpaque(false);
         JLabel lblSearch = new JLabel("Search Title/Author:");
         searchPanel.add(lblSearch);
 
@@ -55,7 +59,7 @@ public class ViewBook extends JFrame {
         searchPanel.add(lblCount);
 
         topContainer.add(searchPanel);
-        add(topContainer, BorderLayout.NORTH);
+        bgPanel.add(topContainer, BorderLayout.NORTH);
 
         // TABLE
         model = new DefaultTableModel();
@@ -87,10 +91,13 @@ public class ViewBook extends JFrame {
         });
 
         JScrollPane scrollPane = new JScrollPane(table);
-        add(scrollPane, BorderLayout.CENTER);
+        scrollPane.setOpaque(false);
+        scrollPane.getViewport().setOpaque(false);
+        bgPanel.add(scrollPane, BorderLayout.CENTER);
 
         // BOTTOM - back button
         JPanel bottomPanel = new JPanel();
+        bottomPanel.setOpaque(false);
         JButton backBtn = new JButton("Back");
         backBtn.setBackground(new Color(220, 53, 69));
         backBtn.setForeground(Color.WHITE);
@@ -102,7 +109,7 @@ public class ViewBook extends JFrame {
         });
 
         bottomPanel.add(backBtn);
-        add(bottomPanel, BorderLayout.SOUTH);
+        bgPanel.add(bottomPanel, BorderLayout.SOUTH);
 
         // ACTIONS
         btnSearch.addActionListener(e -> loadBooks(txtSearch.getText().trim()));
@@ -152,6 +159,15 @@ public class ViewBook extends JFrame {
 
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Error loading books: " + e.getMessage());
+        }
+    }
+
+    class BackgroundPanel extends JPanel {
+        Image bg = new ImageIcon("bgphoto/ViewBook_bg.jpg").getImage();
+
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            g.drawImage(bg, 0, 0, getWidth(), getHeight(), this);
         }
     }
 }

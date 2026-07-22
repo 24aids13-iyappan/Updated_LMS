@@ -32,7 +32,7 @@ public class UserProfile extends JFrame {
         setSize(600, 700);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-
+setResizable(false);
         BackgroundPanel bgPanel = new BackgroundPanel();
         setContentPane(bgPanel);
 

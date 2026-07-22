@@ -23,8 +23,8 @@ public class StudentDetailView extends JFrame {
         setSize(650, 650);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-
-        JPanel main = new JPanel();
+setResizable(false);
+       StudentDetailBackgroundPanel main = new StudentDetailBackgroundPanel("bgphoto/stdview.jpg");
         main.setLayout(new BoxLayout(main, BoxLayout.Y_AXIS));
         main.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         setContentPane(main);
@@ -38,7 +38,7 @@ public class StudentDetailView extends JFrame {
         JPanel formPanel = new JPanel(new GridLayout(0, 2, 10, 8));
         formPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         main.add(formPanel);
-
+formPanel.setOpaque(false);
         Font labelFont = new Font("Segoe UI", Font.BOLD, 14);
 
         try {
@@ -96,7 +96,8 @@ addRow(formPanel, "Current Year:", currentYear, labelFont);
         scroll.setPreferredSize(new Dimension(600, 180));
         scroll.setAlignmentX(Component.LEFT_ALIGNMENT);
         main.add(scroll);
-
+scroll.setOpaque(false);
+scroll.getViewport().setOpaque(false);
         try {
             String sql2 = "SELECT issue_id, book_name, due_date, status, fine_amount FROM issue WHERE user_id=?";
             PreparedStatement pst2 = con.prepareStatement(sql2);
@@ -135,5 +136,23 @@ addRow(formPanel, "Current Year:", currentYear, labelFont);
         l.setFont(font);
         panel.add(l);
         panel.add(new JLabel(value != null ? value : "N/A"));
+    }
+
+}
+class StudentDetailBackgroundPanel extends JPanel {
+
+    private Image bgImage;
+
+    public StudentDetailBackgroundPanel(String imagePath) {
+        bgImage = new ImageIcon(imagePath).getImage();
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+
+        if (bgImage != null) {
+            g.drawImage(bgImage, 0, 0, getWidth(), getHeight(), this);
+        }
     }
 }

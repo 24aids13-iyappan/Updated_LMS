@@ -18,7 +18,7 @@ public class RequestBook extends JFrame {
         setSize(700, 450);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-
+setResizable(false);
         // ===== Background Image Panel =====
         JPanel bgPanel = new JPanel() {
             Image bg = new ImageIcon("bgphoto/requstbook_bg.jpg").getImage();

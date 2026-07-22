@@ -18,6 +18,7 @@ this.userId = userId;
         setSize(900, 500);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+setResizable(false);
 
         BackgroundPanel bgPanel = new BackgroundPanel("bgphoto/ManageRq_bg.jpg");
         bgPanel.setLayout(new BorderLayout());

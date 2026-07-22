@@ -23,6 +23,7 @@ public SignUpGUI(Connection con) {
     setSize(650, 800);
     setLocationRelativeTo(null);
     setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+setResizable(false);
 
     Color brown = new Color(92, 64, 51);
     Color paper = new Color(245, 238, 220);

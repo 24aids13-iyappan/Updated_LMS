@@ -24,7 +24,7 @@ this.userId = userId;
         setSize(600, 700);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
+setResizable(false);
         // Background image panel
         BackgroundPanel bgPanel = new BackgroundPanel("bgphoto/admin_bg.jpg");
         bgPanel.setLayout(null);

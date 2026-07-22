@@ -28,9 +28,10 @@ public class ChatAISearchView extends JFrame {
         this.userid = userid;
 
         setTitle("AI Library Assistant");
-        setSize(750, 650);
+        setSize(600, 500);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+setResizable(false);
 
         JPanel main = new JPanel(new BorderLayout());
         setContentPane(main);

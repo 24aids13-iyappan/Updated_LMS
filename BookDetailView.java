@@ -39,7 +39,7 @@ public class BookDetailView extends JDialog {
         setSize(500, 550);
         setLocationRelativeTo(null);
         setModal(true);
-
+setResizable(false);
         JPanel main = new JPanel(new BorderLayout(10, 10));
         main.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
         setContentPane(main);

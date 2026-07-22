@@ -20,6 +20,7 @@ public class BorrowedBooks extends JFrame {
         setSize(1100, 700);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+setResizable(false);
 
         BackgroundPanel bgPanel = new BackgroundPanel();
         bgPanel.setLayout(null);
