@@ -12,6 +12,7 @@ public class UserDashboard extends JFrame {
     private JPanel chatPanel;
     private JScrollPane chatScroll;
     private JTextField txtInput;
+    private JButton toggleChatBtn;
 
     public UserDashboard(Connection con, String userid) {
         this.con = con;
@@ -19,6 +20,7 @@ public class UserDashboard extends JFrame {
 
         setTitle("User Dashboard");
         setSize(750, 650);
+        setResizable(false);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
@@ -26,13 +28,28 @@ public class UserDashboard extends JFrame {
         bgPanel.setLayout(new BorderLayout());
         setContentPane(bgPanel);
 
+        // Fetch the student's name to display instead of the raw user ID
+        String displayName = userid;
+        try {
+            PreparedStatement namePst = con.prepareStatement("SELECT name FROM users WHERE user_id = ?");
+            namePst.setString(1, userid);
+            ResultSet nameRs = namePst.executeQuery();
+            if (nameRs.next()) {
+                displayName = nameRs.getString("name");
+            }
+            nameRs.close();
+            namePst.close();
+        } catch (Exception ignore) {
+            // fall back to userid if lookup fails
+        }
+
         // TOP - Welcome banner
         JPanel topBanner = new JPanel(new BorderLayout());
         topBanner.setOpaque(true);
         topBanner.setBackground(new Color(0, 0, 0, 140));
         topBanner.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
 
-        JLabel title = new JLabel("Welcome, " + userid + "!");
+        JLabel title = new JLabel("Welcome, " + displayName + "!");
         title.setFont(new Font("Segoe UI", Font.BOLD, 24));
         title.setForeground(Color.WHITE);
         topBanner.add(title, BorderLayout.WEST);
@@ -42,9 +59,16 @@ public class UserDashboard extends JFrame {
         subtitle.setForeground(new Color(220, 220, 220));
         topBanner.add(subtitle, BorderLayout.SOUTH);
 
+        toggleChatBtn = new JButton("\u25B2"); // up arrow = "show chat"
+        toggleChatBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        toggleChatBtn.setFocusPainted(false);
+        toggleChatBtn.setToolTipText("Show/hide chat");
+        toggleChatBtn.setVisible(false); // only shows once there's something to collapse
+        topBanner.add(toggleChatBtn, BorderLayout.EAST);
+
         bgPanel.add(topBanner, BorderLayout.NORTH);
 
-        // CENTER - Embedded chat area
+        // CENTER - Embedded chat area (starts collapsed - only the search bar shows at first)
         chatPanel = new JPanel();
         chatPanel.setLayout(new BoxLayout(chatPanel, BoxLayout.Y_AXIS));
         chatPanel.setOpaque(true);
@@ -56,7 +80,16 @@ public class UserDashboard extends JFrame {
         chatScroll.getVerticalScrollBar().setUnitIncrement(16);
         chatScroll.setOpaque(false);
         chatScroll.getViewport().setOpaque(false);
+        chatScroll.setVisible(false); // hidden until the user searches or clicks the arrow
         bgPanel.add(chatScroll, BorderLayout.CENTER);
+
+        toggleChatBtn.addActionListener(e -> {
+            boolean nowVisible = !chatScroll.isVisible();
+            chatScroll.setVisible(nowVisible);
+            toggleChatBtn.setText(nowVisible ? "\u25BC" : "\u25B2"); // down arrow when open, up when closed
+            bgPanel.revalidate();
+            bgPanel.repaint();
+        });
 
         // BOTTOM - Search input bar
         JPanel inputBar = new JPanel(new BorderLayout(8, 0));
@@ -124,6 +157,13 @@ public class UserDashboard extends JFrame {
     private void sendMessage() {
         String query = txtInput.getText().trim();
         if (query.isEmpty()) return;
+
+        // First search auto-expands the chat area and reveals the toggle arrow
+        if (!chatScroll.isVisible()) {
+            chatScroll.setVisible(true);
+            toggleChatBtn.setVisible(true);
+            toggleChatBtn.setText("\u25BC");
+        }
 
         addUserBubble(query);
         txtInput.setText("");
