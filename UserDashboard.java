@@ -13,6 +13,11 @@ public class UserDashboard extends JFrame {
     private JScrollPane chatScroll;
     private JTextField txtInput;
     private JButton toggleChatBtn;
+    private JPanel bgPanel;
+    private JPanel searchRow;      // holds txtInput + search button - gets moved around
+    private JPanel centerWrapper;  // holds searchRow centered, shown before first search
+    private JPanel bottomInputBar; // holds searchRow at the bottom, shown after first search
+    private boolean chatStarted = false;
 
     public UserDashboard(Connection con, String userid) {
         this.con = con;
@@ -24,7 +29,7 @@ public class UserDashboard extends JFrame {
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        BackgroundPanel bgPanel = new BackgroundPanel();
+        bgPanel = new BackgroundPanel();
         bgPanel.setLayout(new BorderLayout());
         setContentPane(bgPanel);
 
@@ -54,11 +59,6 @@ public class UserDashboard extends JFrame {
         title.setForeground(Color.WHITE);
         topBanner.add(title, BorderLayout.WEST);
 
-        JLabel subtitle = new JLabel("Ask me for any book below \u2193");
-        subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        subtitle.setForeground(new Color(220, 220, 220));
-        topBanner.add(subtitle, BorderLayout.SOUTH);
-
         toggleChatBtn = new JButton("\u25B2"); // up arrow = "show chat"
         toggleChatBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
         toggleChatBtn.setFocusPainted(false);
@@ -68,7 +68,7 @@ public class UserDashboard extends JFrame {
 
         bgPanel.add(topBanner, BorderLayout.NORTH);
 
-        // CENTER - Embedded chat area (starts collapsed - only the search bar shows at first)
+        // Chat message area (hidden until the first search)
         chatPanel = new JPanel();
         chatPanel.setLayout(new BoxLayout(chatPanel, BoxLayout.Y_AXIS));
         chatPanel.setOpaque(true);
@@ -80,24 +80,21 @@ public class UserDashboard extends JFrame {
         chatScroll.getVerticalScrollBar().setUnitIncrement(16);
         chatScroll.setOpaque(false);
         chatScroll.getViewport().setOpaque(false);
-        chatScroll.setVisible(false); // hidden until the user searches or clicks the arrow
-        bgPanel.add(chatScroll, BorderLayout.CENTER);
 
         toggleChatBtn.addActionListener(e -> {
             boolean nowVisible = !chatScroll.isVisible();
             chatScroll.setVisible(nowVisible);
-            toggleChatBtn.setText(nowVisible ? "\u25BC" : "\u25B2"); // down arrow when open, up when closed
+            toggleChatBtn.setText(nowVisible ? "\u25BC" : "\u25B2");
             bgPanel.revalidate();
             bgPanel.repaint();
         });
 
-        // BOTTOM - Search input bar
-        JPanel inputBar = new JPanel(new BorderLayout(8, 0));
-        inputBar.setBorder(BorderFactory.createEmptyBorder(12, 15, 15, 15));
-        inputBar.setOpaque(true);
-        inputBar.setBackground(new Color(0, 0, 0, 140));
+        // The search box + button (this single panel gets moved between
+        // the centered "homepage" position and the bottom bar position)
+        searchRow = new JPanel(new BorderLayout(8, 0));
+        searchRow.setOpaque(false);
 
-        txtInput = new JTextField();
+        txtInput = new JTextField(30);
         txtInput.setFont(new Font("Segoe UI", Font.PLAIN, 16));
         txtInput.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(200, 200, 200), 1, true),
@@ -109,9 +106,44 @@ public class UserDashboard extends JFrame {
         btnSend.setFont(new Font("Segoe UI", Font.BOLD, 14));
         btnSend.setFocusPainted(false);
 
-        inputBar.add(txtInput, BorderLayout.CENTER);
-        inputBar.add(btnSend, BorderLayout.EAST);
-        bgPanel.add(inputBar, BorderLayout.SOUTH);
+        searchRow.add(txtInput, BorderLayout.CENTER);
+        searchRow.add(btnSend, BorderLayout.EAST);
+
+        // --- Centered "homepage" layout (shown BEFORE the first search) ---
+        centerWrapper = new JPanel(new GridBagLayout());
+        centerWrapper.setOpaque(false);
+
+        JPanel homeBox = new JPanel();
+        homeBox.setLayout(new BoxLayout(homeBox, BoxLayout.Y_AXIS));
+        homeBox.setOpaque(false);
+
+        JLabel homeIcon = new JLabel("What book are you looking for?");
+        homeIcon.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        homeIcon.setForeground(Color.WHITE);
+        homeIcon.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JPanel centeredSearchRowHolder = new JPanel();
+        centeredSearchRowHolder.setOpaque(false);
+        centeredSearchRowHolder.setLayout(new BoxLayout(centeredSearchRowHolder, BoxLayout.X_AXIS));
+        searchRow.setPreferredSize(new Dimension(480, 45));
+        searchRow.setMaximumSize(new Dimension(480, 45));
+        centeredSearchRowHolder.add(searchRow);
+        centeredSearchRowHolder.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        homeBox.add(homeIcon);
+        homeBox.add(Box.createVerticalStrut(20));
+        homeBox.add(centeredSearchRowHolder);
+
+        centerWrapper.add(homeBox); // GridBagLayout with no constraints = centered
+
+        bgPanel.add(centerWrapper, BorderLayout.CENTER); // shown first
+
+        // --- Bottom bar layout (used AFTER the first search) ---
+        bottomInputBar = new JPanel(new BorderLayout());
+        bottomInputBar.setBorder(BorderFactory.createEmptyBorder(12, 15, 15, 15));
+        bottomInputBar.setOpaque(true);
+        bottomInputBar.setBackground(new Color(0, 0, 0, 140));
+        // searchRow gets added into this panel later, when the first search happens
 
         btnSend.addActionListener(e -> sendMessage());
         txtInput.addActionListener(e -> sendMessage());
@@ -158,11 +190,25 @@ public class UserDashboard extends JFrame {
         String query = txtInput.getText().trim();
         if (query.isEmpty()) return;
 
-        // First search auto-expands the chat area and reveals the toggle arrow
-        if (!chatScroll.isVisible()) {
+        // First search: move the search bar from center-screen down to the
+        // bottom bar, and swap in the chat area where the centered box was
+        if (!chatStarted) {
+            chatStarted = true;
+
+            bgPanel.remove(centerWrapper);
+            searchRow.setPreferredSize(null);
+            searchRow.setMaximumSize(null);
+            bottomInputBar.add(searchRow, BorderLayout.CENTER);
+
+            bgPanel.add(chatScroll, BorderLayout.CENTER);
+            bgPanel.add(bottomInputBar, BorderLayout.SOUTH);
+
             chatScroll.setVisible(true);
             toggleChatBtn.setVisible(true);
             toggleChatBtn.setText("\u25BC");
+
+            bgPanel.revalidate();
+            bgPanel.repaint();
         }
 
         addUserBubble(query);
