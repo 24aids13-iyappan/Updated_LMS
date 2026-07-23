@@ -39,7 +39,7 @@ public class BookDetailView extends JDialog {
         setSize(500, 550);
         setLocationRelativeTo(null);
         setModal(true);
-setResizable(false);
+
         JPanel main = new JPanel(new BorderLayout(10, 10));
         main.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
         setContentPane(main);
@@ -96,6 +96,7 @@ setResizable(false);
                 }
 
                 StringBuilder sb = new StringBuilder();
+                sb.append("Book ID: ").append(bookId).append("\n");
                 sb.append("Title: ").append(title).append("\n");
                 sb.append("Author: ").append(author).append("\n");
                 sb.append("Publisher: ").append(publisher).append("\n");
